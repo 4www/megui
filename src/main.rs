@@ -1,6 +1,9 @@
 mod app;
 mod artwork;
 mod config;
+mod routes;
+mod components;
+mod pages;
 
 use app::MeguiApp;
 
