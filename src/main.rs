@@ -1,5 +1,6 @@
 mod app;
 mod artwork;
+mod config;
 
 use app::MeguiApp;
 

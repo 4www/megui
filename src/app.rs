@@ -2,6 +2,7 @@ use eframe::egui;
 use std::sync::mpsc::Receiver;
 
 use crate::artwork::{Artwork, ArtworksResponse};
+use crate::config::Config;
 use egui_commonmark::CommonMarkCache;
 
 #[cfg(target_arch = "wasm32")]
@@ -15,6 +16,7 @@ enum View {
 }
 
 pub struct MeguiApp {
+    config: Config,
     current_view: View,
     pub artworks: Vec<Artwork>,
     pub loading: bool,
@@ -31,6 +33,7 @@ pub struct MeguiApp {
 impl Default for MeguiApp {
     fn default() -> Self {
         Self {
+            config: Config::default(),
             current_view: View::Artworks,
             artworks: Vec::new(),
             loading: false,
@@ -114,8 +117,9 @@ impl MeguiApp {
                 let (sender, receiver) = std::sync::mpsc::channel();
                 self.fetch_receiver = Some(receiver);
 
+                let artworks_url = self.config.app.artworks.clone();
                 ehttp::fetch(
-                    ehttp::Request::get("https://artworks.hwww.org/index.json"),
+                    ehttp::Request::get(&artworks_url),
                     move |result| {
                         let _ = sender.send(result);
                         ctx.request_repaint();
@@ -157,9 +161,32 @@ impl MeguiApp {
     fn render_artwork_modals(&mut self, ctx: &egui::Context) {
         let mut to_remove = Vec::new();
 
+        #[cfg(target_arch = "wasm32")]
         for (idx, artwork) in self.selected_artworks.iter().enumerate() {
             let mut open = true;
-            let artwork_url = format!("https://artworks.hwww.org/{}/", artwork.name);
+            let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
+            let artwork_url = format!("{}/{}/", artworks_base, artwork.name);
+            let iframe_content = format!(
+                r#"<iframe src="{}" style="width: 100%; height: 100%; border: none;"></iframe>"#,
+                artwork_url
+            );
+
+            HtmlWindow::new(&artwork.name)
+                .id(&format!("artwork_window_{}", artwork.name))
+                .open(&mut open)
+                .content(&iframe_content)
+                .show(ctx);
+
+            if !open {
+                to_remove.push(idx);
+            }
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        for (idx, artwork) in self.selected_artworks.iter().enumerate() {
+            let mut open = true;
+            let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
+            let artwork_url = format!("{}/{}/", artworks_base, artwork.name);
 
             egui::Window::new(&artwork.name)
                 .id(egui::Id::new(format!("artwork_window_{}", artwork.name)))
@@ -177,30 +204,15 @@ impl MeguiApp {
                         ctx.open_url(egui::OpenUrl::new_tab(&artwork_url));
                     }
 
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        ui.add_space(5.0);
-                        ui.separator();
-                        ui.add_space(5.0);
-                        ui.label("Note: iframe preview only available in web version.");
-                        ui.label("Click 'Open in New Tab' to view the artwork.");
-                    }
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.add_space(5.0);
+                    ui.label("Note: iframe preview only available in web version.");
+                    ui.label("Click 'Open in New Tab' to view the artwork.");
                 });
 
             if !open {
                 to_remove.push(idx);
-            }
-
-            // Render the iframe as an HtmlWindow behind the modal (web only)
-            #[cfg(target_arch = "wasm32")]
-            {
-                let iframe_content = format!(
-                    r#"<iframe src="{}" style="width: 100%; height: 100%; border: none;"></iframe>"#,
-                    artwork_url
-                );
-                HtmlWindow::new(&format!("iframe_{}", artwork.name))
-                    .content(&iframe_content)
-                    .show(ctx);
             }
         }
 
@@ -238,8 +250,9 @@ impl MeguiApp {
                             let (sender, receiver) = std::sync::mpsc::channel();
                             self.resume_receiver = Some(receiver);
 
+                            let resume_url = self.config.app.resume.clone();
                             ehttp::fetch(
-                                ehttp::Request::get("https://resume.hwww.org"),
+                                ehttp::Request::get(&resume_url),
                                 move |result| {
                                     let _ = sender.send(result);
                                     ctx.request_repaint();
@@ -273,11 +286,12 @@ impl MeguiApp {
 
                 // External links section
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                    ui.hyperlink_to("📄 Resume", "https://resume.hwww.org");
+                    ui.hyperlink_to("📄 Resume", &self.config.app.resume);
                     ui.add_space(3.0);
-                    ui.hyperlink_to("🎨 Artworks", "https://artworks.hwww.org");
+                    let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
+                    ui.hyperlink_to("🎨 Artworks", artworks_base);
                     ui.add_space(3.0);
-                    ui.hyperlink_to("🌐 hwww.org", "https://hwww.org");
+                    ui.hyperlink_to(&format!("🌐 {}", self.config.app.name), &self.config.app.website);
 
                     ui.add_space(5.0);
                     ui.label("External Links:");
@@ -308,7 +322,7 @@ impl MeguiApp {
         ui.add_space(10.0);
 
         if ui.button("🔗 Open in New Tab").clicked() {
-            ctx.open_url(egui::OpenUrl::new_tab("https://resume.hwww.org"));
+            ctx.open_url(egui::OpenUrl::new_tab(&self.config.app.resume));
         }
 
         ui.add_space(10.0);
@@ -330,7 +344,7 @@ impl MeguiApp {
         ui.heading("About");
         ui.add_space(10.0);
 
-        ui.label("megui - A simple artworks viewer and portfolio");
+        ui.label(format!("{} - A simple artworks viewer and portfolio", self.config.app.name));
         ui.add_space(10.0);
 
         ui.label("Built with:");
@@ -342,8 +356,15 @@ impl MeguiApp {
         ui.separator();
         ui.add_space(10.0);
 
-        ui.label("This app fetches and displays artworks from artworks.hwww.org");
-        ui.label("and renders the resume from resume.hwww.org");
+        let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
+        ui.label(format!("This app fetches and displays artworks from {}", artworks_base));
+        ui.label(format!("and renders the resume from {}", self.config.app.resume));
+        ui.add_space(10.0);
+
+        ui.horizontal(|ui| {
+            ui.label("Repository:");
+            ui.hyperlink(&self.config.app.repository);
+        });
     }
 }
 
@@ -364,12 +385,14 @@ impl eframe::App for MeguiApp {
                     self.sidebar_open = !self.sidebar_open;
                 }
                 ui.separator();
+                ui.heading(&self.config.app.name);
+                ui.separator();
                 let title = match self.current_view {
                     View::Artworks => "Artworks",
                     View::Resume => "Resume",
                     View::About => "About",
                 };
-                ui.heading(title);
+                ui.label(title);
             });
         });
 

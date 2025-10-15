@@ -1,0 +1,6 @@
+[app]
+name = "hwww"
+website = "https://hwww.org"
+resume = "https://resume.hwww.org"
+artworks = "https://artworks.hwww.org/index.json"
+repository = "https://github.com/4www/megui"
