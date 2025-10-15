@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>megui</title>
+
+    <!-- Trunk will inject the WASM and JS here -->
     
-  <link rel="modulepreload" href="/megui-3cec0b6283e7cc84.js" crossorigin="anonymous" integrity="sha384-emMHysjLxSoP/CZSMhxIyqoplAsY1VlFb837TocgqitKeAV7NiJFflrx/xKDCG2F"><link rel="preload" href="/megui-3cec0b6283e7cc84_bg.wasm" crossorigin="anonymous" integrity="sha384-Oa8k36vDKBrt8NWRMS1bDW/F1Nd54VDOY0S54gfmxEZGte95fv3EVmrixqKI2fJb" as="fetch" type="application/wasm"></head>
-  <body>
 <script type="module">
-import init, * as bindings from '/megui-3cec0b6283e7cc84.js';
-const wasm = await init({ module_or_path: '/megui-3cec0b6283e7cc84_bg.wasm' });
+import init, * as bindings from '/megui-1c25d03fd2a15829.js';
+const wasm = await init({ module_or_path: '/megui-1c25d03fd2a15829_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -16,5 +17,30 @@ window.wasmBindings = bindings;
 
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
-</script></body>
+</script>
+    
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #the_canvas_id {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+<link rel="modulepreload" href="/megui-1c25d03fd2a15829.js" crossorigin="anonymous" integrity="sha384-2u1nK5UnqtubwuQj/y4nzVdQh6G0t35v1lFcRKc1jElRIYZaHawWyeQI7eaa8SB3"><link rel="preload" href="/megui-1c25d03fd2a15829_bg.wasm" crossorigin="anonymous" integrity="sha384-ARYp9syyHd1r6J/6N2nFYh3pIG7Az2gyAPcMRA0bfgM0czNs/wKQc8zzPLSrUTYk" as="fetch" type="application/wasm"></head>
+<body>
+    <canvas id="the_canvas_id"></canvas>
+</body>
 </html>
