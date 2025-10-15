@@ -15,15 +15,34 @@ enum View {
     About,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ThemeMode {
+    Auto,
+    Dark,
+    Light,
+}
+
+impl ThemeMode {
+    fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "dark" => ThemeMode::Dark,
+            "light" => ThemeMode::Light,
+            _ => ThemeMode::Auto,
+        }
+    }
+}
+
 pub struct MeguiApp {
     config: Config,
     current_view: View,
+    theme_mode: ThemeMode,
     pub artworks: Vec<Artwork>,
     pub loading: bool,
     pub error: Option<String>,
     pub selected_artworks: Vec<Artwork>,
     pub fetch_receiver: Option<Receiver<ehttp::Result<ehttp::Response>>>,
     sidebar_open: bool,
+    settings_open: bool,
     resume_content: Option<String>,
     resume_loading: bool,
     resume_receiver: Option<Receiver<ehttp::Result<ehttp::Response>>>,
@@ -32,24 +51,99 @@ pub struct MeguiApp {
 
 impl Default for MeguiApp {
     fn default() -> Self {
-        Self {
-            config: Config::default(),
-            current_view: View::Artworks,
+        let config = Config::default();
+        let theme_mode = ThemeMode::from_str(&config.app.default_theme);
+
+        // Check for initial route from URL hash
+        let initial_view = Self::get_view_from_url();
+
+        let mut app = Self {
+            config,
+            current_view: initial_view,
+            theme_mode,
             artworks: Vec::new(),
             loading: false,
             error: None,
             selected_artworks: Vec::new(),
             fetch_receiver: None,
             sidebar_open: true,
+            settings_open: false,
             resume_content: None,
             resume_loading: false,
             resume_receiver: None,
             markdown_cache: CommonMarkCache::default(),
+        };
+
+        // Auto-fetch artworks on startup
+        app.start_artworks_fetch();
+
+        app
+    }
+}
+
+impl View {
+    #[cfg(target_arch = "wasm32")]
+    fn to_hash(&self) -> &'static str {
+        match self {
+            View::Artworks => "#/artworks",
+            View::Resume => "#/resume",
+            View::About => "#/about",
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn from_hash(hash: &str) -> Option<Self> {
+        match hash {
+            "#/artworks" | "#artworks" => Some(View::Artworks),
+            "#/resume" | "#resume" => Some(View::Resume),
+            "#/about" | "#about" => Some(View::About),
+            _ => None,
         }
     }
 }
 
 impl MeguiApp {
+    fn start_artworks_fetch(&mut self) {
+        self.loading = true;
+        self.error = None;
+        let (sender, receiver) = std::sync::mpsc::channel();
+        self.fetch_receiver = Some(receiver);
+
+        let artworks_url = self.config.app.artworks.clone();
+        ehttp::fetch(
+            ehttp::Request::get(&artworks_url),
+            move |result| {
+                let _ = sender.send(result);
+            },
+        );
+    }
+
+    fn get_view_from_url() -> View {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window() {
+                if let Ok(location) = window.location().hash() {
+                    if let Some(view) = View::from_hash(&location) {
+                        return view;
+                    }
+                }
+            }
+        }
+        View::Artworks
+    }
+
+    fn update_url_hash(&self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window() {
+                if let Some(history) = window.history().ok() {
+                    let hash = self.current_view.to_hash();
+                    let _ = history.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(hash));
+                }
+            }
+        }
+    }
+
     fn process_fetch_response(&mut self) {
         if let Some(receiver) = &self.fetch_receiver {
             if let Ok(result) = receiver.try_recv() {
@@ -110,7 +204,7 @@ impl MeguiApp {
 
     fn render_fetch_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.horizontal(|ui| {
-            if ui.button("Fetch Artworks").clicked() && !self.loading {
+            if ui.button("🔄 Refresh Artworks").clicked() && !self.loading {
                 self.loading = true;
                 self.error = None;
                 let ctx = ctx.clone();
@@ -129,6 +223,7 @@ impl MeguiApp {
 
             if self.loading {
                 ui.spinner();
+                ui.label("Loading...");
             }
         });
     }
@@ -153,8 +248,9 @@ impl MeguiApp {
                     });
                 }
             });
-        } else if !self.loading && self.error.is_none() {
-            ui.label("Click 'Fetch Artworks' to load the gallery");
+        } else if self.loading {
+            ui.spinner();
+            ui.label("Loading artworks...");
         }
     }
 
@@ -235,6 +331,7 @@ impl MeguiApp {
                 let artworks_selected = self.current_view == View::Artworks;
                 if ui.selectable_label(artworks_selected, "Artworks").clicked() {
                     self.current_view = View::Artworks;
+                    self.update_url_hash();
                 }
 
                 ui.add_space(5.0);
@@ -261,6 +358,7 @@ impl MeguiApp {
                         } else if self.resume_content.is_some() {
                             self.current_view = View::Resume;
                         }
+                        self.update_url_hash();
                     }
 
                     if self.resume_loading {
@@ -274,6 +372,7 @@ impl MeguiApp {
                 let about_selected = self.current_view == View::About;
                 if ui.selectable_label(about_selected, "About").clicked() {
                     self.current_view = View::About;
+                    self.update_url_hash();
                 }
 
                 ui.add_space(10.0);
@@ -284,18 +383,17 @@ impl MeguiApp {
 
                 ui.add_space(10.0);
 
-                // External links section
+                // Settings button and footer
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                    ui.hyperlink_to("📄 Resume", &self.config.app.resume);
-                    ui.add_space(3.0);
-                    let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
-                    ui.hyperlink_to("🎨 Artworks", artworks_base);
-                    ui.add_space(3.0);
-                    ui.hyperlink_to(&format!("🌐 {}", self.config.app.name), &self.config.app.website);
+                    ui.add_space(10.0);
+                    ui.label(format!("{} ©", self.config.app.name));
+                    ui.add_space(10.0);
 
-                    ui.add_space(5.0);
-                    ui.label("External Links:");
-                    ui.add_space(3.0);
+                    if ui.button("⚙ Settings").clicked() {
+                        self.settings_open = true;
+                    }
+
+                    ui.add_space(10.0);
                     ui.separator();
                     ui.add_space(10.0);
                 });
@@ -340,7 +438,75 @@ impl MeguiApp {
         });
     }
 
-    fn render_about_view(&mut self, ui: &mut egui::Ui) {
+    fn render_settings_modal(&mut self, ctx: &egui::Context) {
+        egui::Window::new("⚙ Settings")
+            .open(&mut self.settings_open)
+            .resizable(false)
+            .default_width(400.0)
+            .show(ctx, |ui| {
+                ui.heading("Theme");
+                ui.add_space(5.0);
+
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(self.theme_mode == ThemeMode::Auto, "Auto").clicked() {
+                        self.theme_mode = ThemeMode::Auto;
+                    }
+                    if ui.selectable_label(self.theme_mode == ThemeMode::Light, "Light").clicked() {
+                        self.theme_mode = ThemeMode::Light;
+                    }
+                    if ui.selectable_label(self.theme_mode == ThemeMode::Dark, "Dark").clicked() {
+                        self.theme_mode = ThemeMode::Dark;
+                    }
+                });
+
+                ui.add_space(15.0);
+                ui.separator();
+                ui.add_space(15.0);
+
+                ui.heading("Configuration");
+                ui.add_space(5.0);
+
+                egui::Grid::new("config_grid")
+                    .num_columns(2)
+                    .spacing([10.0, 8.0])
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("Name:");
+                        ui.label(&self.config.app.name);
+                        ui.end_row();
+
+                        ui.label("Website:");
+                        ui.hyperlink_to(&self.config.app.website, &self.config.app.website);
+                        ui.end_row();
+
+                        ui.label("Resume:");
+                        ui.hyperlink_to(&self.config.app.resume, &self.config.app.resume);
+                        ui.end_row();
+
+                        ui.label("Artworks:");
+                        let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
+                        ui.hyperlink_to(artworks_base, artworks_base);
+                        ui.end_row();
+
+                        ui.label("Repository:");
+                        ui.hyperlink_to(&self.config.app.repository, &self.config.app.repository);
+                        ui.end_row();
+
+                        ui.label("Current Theme:");
+                        let theme_str = match self.theme_mode {
+                            ThemeMode::Auto => "Auto",
+                            ThemeMode::Light => "Light",
+                            ThemeMode::Dark => "Dark",
+                        };
+                        ui.label(theme_str);
+                        ui.end_row();
+                    });
+
+                ui.add_space(15.0);
+            });
+    }
+
+    fn render_about_view(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
         ui.heading("About");
         ui.add_space(10.0);
 
@@ -348,28 +514,55 @@ impl MeguiApp {
         ui.add_space(10.0);
 
         ui.label("Built with:");
-        ui.label("• Rust");
-        ui.label("• egui - Immediate mode GUI framework");
-        ui.label("• eframe - Web and native support");
-        ui.add_space(10.0);
-
-        ui.separator();
-        ui.add_space(10.0);
-
-        let artworks_base = self.config.app.artworks.trim_end_matches("/index.json");
-        ui.label(format!("This app fetches and displays artworks from {}", artworks_base));
-        ui.label(format!("and renders the resume from {}", self.config.app.resume));
-        ui.add_space(10.0);
-
         ui.horizontal(|ui| {
-            ui.label("Repository:");
-            ui.hyperlink(&self.config.app.repository);
+            ui.label("•");
+            ui.hyperlink_to("Rust", "https://www.rust-lang.org/");
         });
+        ui.horizontal(|ui| {
+            ui.label("•");
+            ui.hyperlink_to("egui", "https://www.egui.rs/");
+            ui.label("- Immediate mode GUI framework");
+        });
+        ui.horizontal(|ui| {
+            ui.label("•");
+            ui.hyperlink_to("eframe", "https://github.com/emilk/egui/tree/master/crates/eframe");
+            ui.label("- Web and native support");
+        });
+        ui.add_space(10.0);
     }
 }
 
 impl eframe::App for MeguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Apply theme
+        match self.theme_mode {
+            ThemeMode::Light => ctx.set_visuals(egui::Visuals::light()),
+            ThemeMode::Dark => ctx.set_visuals(egui::Visuals::dark()),
+            ThemeMode::Auto => {
+                // Use system preference if available, otherwise default to dark
+                #[cfg(target_arch = "wasm32")]
+                {
+                    if let Some(window) = web_sys::window() {
+                        if let Ok(media_query) = window.match_media("(prefers-color-scheme: dark)") {
+                            if let Some(mq) = media_query {
+                                if mq.matches() {
+                                    ctx.set_visuals(egui::Visuals::dark());
+                                } else {
+                                    ctx.set_visuals(egui::Visuals::light());
+                                }
+                            }
+                        }
+                    }
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    // On native, we could use a crate like `dark-light` to detect system theme
+                    // For now, default to dark
+                    ctx.set_visuals(egui::Visuals::dark());
+                }
+            }
+        }
+
         // Check for fetch responses
         self.process_fetch_response();
         self.process_resume_response();
@@ -404,12 +597,15 @@ impl eframe::App for MeguiApp {
             match self.current_view {
                 View::Artworks => self.render_artworks_view(ui, ctx),
                 View::Resume => self.render_resume_view(ui, ctx),
-                View::About => self.render_about_view(ui),
+                View::About => self.render_about_view(ui, ctx),
             }
         });
 
         // Artwork detail modals (can have multiple open at once)
         self.render_artwork_modals(ctx);
+
+        // Settings modal
+        self.render_settings_modal(ctx);
 
         // Sync hframe (required for iframe rendering on web)
         #[cfg(target_arch = "wasm32")]

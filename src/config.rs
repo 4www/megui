@@ -7,6 +7,12 @@ pub struct AppConfig {
     pub resume: String,
     pub artworks: String,
     pub repository: String,
+    #[serde(default = "default_theme")]
+    pub default_theme: String,
+}
+
+fn default_theme() -> String {
+    "auto".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
