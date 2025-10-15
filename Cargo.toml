@@ -4,12 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.76"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
-console_error_panic_hook = "0.1"
-tracing-wasm = "0.2"
 egui = "0.33"
 eframe = { version = "0.33", default-features = false, features = [
     "default_fonts",
