@@ -4,12 +4,12 @@ A simple artworks viewer and portfolio built with Rust, egui, and eframe.
 
 ## Features
 
-- 🎨 **Artworks Gallery**: Browse and view artworks from your collection
-- 📄 **Resume Viewer**: Display your resume with markdown rendering
-- 🌓 **Theme Support**: Auto, light, and dark modes
-- 🔗 **Deep Linking**: Direct URLs to specific pages (e.g., `#/resume`, `#/about`)
-- 🖼️ **Multiple Artwork Windows**: Open and view multiple artworks simultaneously
-- 🌐 **Cross-Platform**: Runs natively and on the web (WASM)
+- **Artworks Gallery**: Browse and view artworks from your collection
+- **Resume Viewer**: Display your resume with markdown rendering
+- **Theme Support**: Auto, light, and dark modes
+- **Deep Linking**: Direct URLs to specific pages
+- **Multiple Artwork Windows**: Open and view multiple artworks simultaneously
+- **Cross-Platform**: Runs natively and on the web (WASM)
 
 ## Project Structure
 
@@ -19,7 +19,7 @@ megui/
 │   ├── main.rs          # Application entry point
 │   ├── app.rs           # Main application logic, views, and UI
 │   ├── config.rs        # Configuration loader
-│   └── artwork.rs       # Artwork data structures
+│   ├── artwork.rs       # Artwork data structures
 ├── config.toml          # Application configuration
 ├── index.html           # Web entry point
 ├── Cargo.toml           # Rust dependencies
