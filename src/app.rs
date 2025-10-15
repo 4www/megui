@@ -4,9 +4,12 @@ use std::sync::mpsc::Receiver;
 use crate::artwork::{Artwork, ArtworksResponse};
 use egui_commonmark::CommonMarkCache;
 
+#[cfg(target_arch = "wasm32")]
+use hframe::HtmlWindow;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum View {
-    Gallery,
+    Artworks,
     Resume,
     About,
 }
@@ -16,7 +19,7 @@ pub struct MeguiApp {
     pub artworks: Vec<Artwork>,
     pub loading: bool,
     pub error: Option<String>,
-    pub selected_artwork: Option<Artwork>,
+    pub selected_artworks: Vec<Artwork>,
     pub fetch_receiver: Option<Receiver<ehttp::Result<ehttp::Response>>>,
     sidebar_open: bool,
     resume_content: Option<String>,
@@ -28,11 +31,11 @@ pub struct MeguiApp {
 impl Default for MeguiApp {
     fn default() -> Self {
         Self {
-            current_view: View::Gallery,
+            current_view: View::Artworks,
             artworks: Vec::new(),
             loading: false,
             error: None,
-            selected_artwork: None,
+            selected_artworks: Vec::new(),
             fetch_receiver: None,
             sidebar_open: true,
             resume_content: None,
@@ -135,7 +138,10 @@ impl MeguiApp {
                 for artwork in &self.artworks {
                     ui.horizontal(|ui| {
                         if ui.button(&artwork.name).clicked() {
-                            self.selected_artwork = Some(artwork.clone());
+                            // Add to selected artworks if not already open
+                            if !self.selected_artworks.iter().any(|a| a.name == artwork.name) {
+                                self.selected_artworks.push(artwork.clone());
+                            }
                         }
                         if let Some(info) = &artwork.info {
                             ui.label(info);
@@ -148,40 +154,59 @@ impl MeguiApp {
         }
     }
 
-    fn render_artwork_modal(&mut self, ctx: &egui::Context) {
-        if let Some(artwork) = &self.selected_artwork {
+    fn render_artwork_modals(&mut self, ctx: &egui::Context) {
+        let mut to_remove = Vec::new();
+
+        for (idx, artwork) in self.selected_artworks.iter().enumerate() {
             let mut open = true;
             let artwork_url = format!("https://artworks.hwww.org/{}/", artwork.name);
 
             egui::Window::new(&artwork.name)
+                .id(egui::Id::new(format!("artwork_window_{}", artwork.name)))
                 .open(&mut open)
                 .resizable(true)
-                .default_width(600.0)
-                .default_height(500.0)
+                .default_width(800.0)
+                .default_height(600.0)
                 .show(ctx, |ui| {
                     if let Some(info) = &artwork.info {
                         ui.label(info);
-                        ui.add_space(10.0);
+                        ui.add_space(5.0);
                     }
 
-                    ui.horizontal(|ui| {
-                        if ui.button("🔗 Open in New Tab").clicked() {
-                            ctx.open_url(egui::OpenUrl::new_tab(&artwork_url));
-                        }
+                    if ui.button("🔗 Open in New Tab").clicked() {
+                        ctx.open_url(egui::OpenUrl::new_tab(&artwork_url));
+                    }
 
-                        ui.label(&artwork_url);
-                    });
-
-                    ui.add_space(10.0);
-                    ui.separator();
-                    ui.add_space(10.0);
-
-                    ui.label("Note: egui cannot embed iframes. Click 'Open in New Tab' to view the artwork.");
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        ui.add_space(5.0);
+                        ui.separator();
+                        ui.add_space(5.0);
+                        ui.label("Note: iframe preview only available in web version.");
+                        ui.label("Click 'Open in New Tab' to view the artwork.");
+                    }
                 });
 
             if !open {
-                self.selected_artwork = None;
+                to_remove.push(idx);
             }
+
+            // Render the iframe as an HtmlWindow behind the modal (web only)
+            #[cfg(target_arch = "wasm32")]
+            {
+                let iframe_content = format!(
+                    r#"<iframe src="{}" style="width: 100%; height: 100%; border: none;"></iframe>"#,
+                    artwork_url
+                );
+                HtmlWindow::new(&format!("iframe_{}", artwork.name))
+                    .content(&iframe_content)
+                    .show(ctx);
+            }
+        }
+
+        // Remove closed artworks in reverse order to maintain correct indices
+        for idx in to_remove.iter().rev() {
+            self.selected_artworks.remove(*idx);
         }
     }
 
@@ -194,10 +219,10 @@ impl MeguiApp {
                 ui.separator();
                 ui.add_space(10.0);
 
-                // Gallery view
-                let gallery_selected = self.current_view == View::Gallery;
-                if ui.selectable_label(gallery_selected, "Gallery").clicked() {
-                    self.current_view = View::Gallery;
+                // Artworks view
+                let artworks_selected = self.current_view == View::Artworks;
+                if ui.selectable_label(artworks_selected, "Artworks").clicked() {
+                    self.current_view = View::Artworks;
                 }
 
                 ui.add_space(5.0);
@@ -248,22 +273,22 @@ impl MeguiApp {
 
                 // External links section
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                    ui.add_space(10.0);
-                    ui.separator();
+                    ui.hyperlink_to("📄 Resume", "https://resume.hwww.org");
+                    ui.add_space(3.0);
+                    ui.hyperlink_to("🎨 Artworks", "https://artworks.hwww.org");
+                    ui.add_space(3.0);
+                    ui.hyperlink_to("🌐 hwww.org", "https://hwww.org");
+
                     ui.add_space(5.0);
                     ui.label("External Links:");
                     ui.add_space(3.0);
-
-                    ui.hyperlink_to("🌐 hwww.org", "https://hwww.org");
-                    ui.add_space(3.0);
-                    ui.hyperlink_to("🎨 Artworks Gallery", "https://artworks.hwww.org");
-                    ui.add_space(3.0);
-                    ui.hyperlink_to("📄 Resume", "https://resume.hwww.org");
+                    ui.separator();
+                    ui.add_space(10.0);
                 });
             });
     }
 
-    fn render_gallery_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn render_artworks_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         self.render_fetch_button(ui, ctx);
 
         // Error display
@@ -305,7 +330,7 @@ impl MeguiApp {
         ui.heading("About");
         ui.add_space(10.0);
 
-        ui.label("megui - A simple artworks gallery and portfolio viewer");
+        ui.label("megui - A simple artworks viewer and portfolio");
         ui.add_space(10.0);
 
         ui.label("Built with:");
@@ -340,7 +365,7 @@ impl eframe::App for MeguiApp {
                 }
                 ui.separator();
                 let title = match self.current_view {
-                    View::Gallery => "Artworks Gallery",
+                    View::Artworks => "Artworks",
                     View::Resume => "Resume",
                     View::About => "About",
                 };
@@ -354,13 +379,17 @@ impl eframe::App for MeguiApp {
         // Render main content based on current view
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.current_view {
-                View::Gallery => self.render_gallery_view(ui, ctx),
+                View::Artworks => self.render_artworks_view(ui, ctx),
                 View::Resume => self.render_resume_view(ui, ctx),
                 View::About => self.render_about_view(ui),
             }
         });
 
-        // Artwork detail modal (still used for individual artwork details)
-        self.render_artwork_modal(ctx);
+        // Artwork detail modals (can have multiple open at once)
+        self.render_artwork_modals(ctx);
+
+        // Sync hframe (required for iframe rendering on web)
+        #[cfg(target_arch = "wasm32")]
+        hframe::sync(ctx);
     }
 }

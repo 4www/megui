@@ -2,7 +2,6 @@ mod app;
 mod artwork;
 
 use app::MeguiApp;
-use eframe::egui;
 
 fn main() -> Result<(), eframe::Error> {
     #[cfg(not(target_arch = "wasm32"))]
@@ -21,6 +20,8 @@ fn main() -> Result<(), eframe::Error> {
 
     #[cfg(target_arch = "wasm32")]
     {
+        use eframe::wasm_bindgen::JsCast;
+
         // Redirect tracing to console.log and friends:
         eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
