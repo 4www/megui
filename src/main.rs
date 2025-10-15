@@ -27,9 +27,20 @@ fn main() -> Result<(), eframe::Error> {
         let web_options = eframe::WebOptions::default();
 
         wasm_bindgen_futures::spawn_local(async {
+            let document = web_sys::window()
+                .expect("No window")
+                .document()
+                .expect("No document");
+
+            let canvas = document
+                .get_element_by_id("the_canvas_id")
+                .expect("Failed to find the_canvas_id")
+                .dyn_into::<web_sys::HtmlCanvasElement>()
+                .expect("the_canvas_id was not a HtmlCanvasElement");
+
             eframe::WebRunner::new()
                 .start(
-                    "the_canvas_id",
+                    canvas,
                     web_options,
                     Box::new(|_cc| Ok(Box::new(MeguiApp::default()))),
                 )

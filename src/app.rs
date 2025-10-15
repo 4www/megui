@@ -2,25 +2,43 @@ use eframe::egui;
 use std::sync::mpsc::Receiver;
 
 use crate::artwork::{Artwork, ArtworksResponse};
+use egui_commonmark::CommonMarkCache;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum View {
+    Gallery,
+    Resume,
+    About,
+}
 
 pub struct MeguiApp {
-    show_modal: bool,
+    current_view: View,
     pub artworks: Vec<Artwork>,
     pub loading: bool,
     pub error: Option<String>,
     pub selected_artwork: Option<Artwork>,
     pub fetch_receiver: Option<Receiver<ehttp::Result<ehttp::Response>>>,
+    sidebar_open: bool,
+    resume_content: Option<String>,
+    resume_loading: bool,
+    resume_receiver: Option<Receiver<ehttp::Result<ehttp::Response>>>,
+    markdown_cache: CommonMarkCache,
 }
 
 impl Default for MeguiApp {
     fn default() -> Self {
         Self {
-            show_modal: false,
+            current_view: View::Gallery,
             artworks: Vec::new(),
             loading: false,
             error: None,
             selected_artwork: None,
             fetch_receiver: None,
+            sidebar_open: true,
+            resume_content: None,
+            resume_loading: false,
+            resume_receiver: None,
+            markdown_cache: CommonMarkCache::default(),
         }
     }
 }
@@ -53,6 +71,31 @@ impl MeguiApp {
                     }
                     Err(e) => {
                         self.error = Some(format!("Fetch error: {}", e));
+                    }
+                }
+            }
+        }
+    }
+
+    fn process_resume_response(&mut self) {
+        if let Some(receiver) = &self.resume_receiver {
+            if let Ok(result) = receiver.try_recv() {
+                self.resume_loading = false;
+                self.resume_receiver = None;
+
+                match result {
+                    Ok(response) => {
+                        if let Some(html) = response.text() {
+                            // Convert HTML to Markdown
+                            let markdown = html2md::parse_html(html);
+                            self.resume_content = Some(markdown);
+                            self.current_view = View::Resume;
+                        } else {
+                            self.error = Some("Failed to read resume".to_string());
+                        }
+                    }
+                    Err(e) => {
+                        self.error = Some(format!("Resume fetch error: {}", e));
                     }
                 }
             }
@@ -141,51 +184,183 @@ impl MeguiApp {
             }
         }
     }
+
+    fn render_sidebar(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("sidebar")
+            .resizable(true)
+            .default_width(200.0)
+            .show_animated(ctx, self.sidebar_open, |ui| {
+                ui.heading("Menu");
+                ui.separator();
+                ui.add_space(10.0);
+
+                // Gallery view
+                let gallery_selected = self.current_view == View::Gallery;
+                if ui.selectable_label(gallery_selected, "Gallery").clicked() {
+                    self.current_view = View::Gallery;
+                }
+
+                ui.add_space(5.0);
+
+                // Resume view
+                let resume_selected = self.current_view == View::Resume;
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(resume_selected, "Resume").clicked() {
+                        if self.resume_content.is_none() && !self.resume_loading {
+                            // Fetch resume if not already loaded
+                            self.resume_loading = true;
+                            let ctx = ctx.clone();
+                            let (sender, receiver) = std::sync::mpsc::channel();
+                            self.resume_receiver = Some(receiver);
+
+                            ehttp::fetch(
+                                ehttp::Request::get("https://resume.hwww.org"),
+                                move |result| {
+                                    let _ = sender.send(result);
+                                    ctx.request_repaint();
+                                },
+                            );
+                        } else if self.resume_content.is_some() {
+                            self.current_view = View::Resume;
+                        }
+                    }
+
+                    if self.resume_loading {
+                        ui.spinner();
+                    }
+                });
+
+                ui.add_space(5.0);
+
+                // About view
+                let about_selected = self.current_view == View::About;
+                if ui.selectable_label(about_selected, "About").clicked() {
+                    self.current_view = View::About;
+                }
+
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+
+                ui.label(format!("Artworks loaded: {}", self.artworks.len()));
+
+                ui.add_space(10.0);
+
+                // External links section
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.add_space(5.0);
+                    ui.label("External Links:");
+                    ui.add_space(3.0);
+
+                    ui.hyperlink_to("🌐 hwww.org", "https://hwww.org");
+                    ui.add_space(3.0);
+                    ui.hyperlink_to("🎨 Artworks Gallery", "https://artworks.hwww.org");
+                    ui.add_space(3.0);
+                    ui.hyperlink_to("📄 Resume", "https://resume.hwww.org");
+                });
+            });
+    }
+
+    fn render_gallery_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        self.render_fetch_button(ui, ctx);
+
+        // Error display
+        if let Some(error) = &self.error {
+            ui.colored_label(egui::Color32::RED, format!("Error: {}", error));
+        }
+
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(10.0);
+
+        self.render_artworks_list(ui);
+    }
+
+    fn render_resume_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.heading("Resume");
+        ui.add_space(10.0);
+
+        if ui.button("🔗 Open in New Tab").clicked() {
+            ctx.open_url(egui::OpenUrl::new_tab("https://resume.hwww.org"));
+        }
+
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(10.0);
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            if let Some(markdown) = &self.resume_content {
+                // Render markdown with proper formatting
+                egui_commonmark::CommonMarkViewer::new()
+                    .show(ui, &mut self.markdown_cache, markdown);
+            } else {
+                ui.label("Loading resume...");
+            }
+        });
+    }
+
+    fn render_about_view(&mut self, ui: &mut egui::Ui) {
+        ui.heading("About");
+        ui.add_space(10.0);
+
+        ui.label("megui - A simple artworks gallery and portfolio viewer");
+        ui.add_space(10.0);
+
+        ui.label("Built with:");
+        ui.label("• Rust");
+        ui.label("• egui - Immediate mode GUI framework");
+        ui.label("• eframe - Web and native support");
+        ui.add_space(10.0);
+
+        ui.separator();
+        ui.add_space(10.0);
+
+        ui.label("This app fetches and displays artworks from artworks.hwww.org");
+        ui.label("and renders the resume from resume.hwww.org");
+    }
 }
 
 impl eframe::App for MeguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Check for fetch response
+        // Check for fetch responses
         self.process_fetch_response();
+        self.process_resume_response();
 
-        if self.fetch_receiver.is_some() {
+        if self.fetch_receiver.is_some() || self.resume_receiver.is_some() {
             ctx.request_repaint();
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Artworks Gallery");
-            ui.add_space(10.0);
-
-            self.render_fetch_button(ui, ctx);
-
-            // Error display
-            if let Some(error) = &self.error {
-                ui.colored_label(egui::Color32::RED, format!("Error: {}", error));
-            }
-
-            ui.add_space(10.0);
-            ui.separator();
-            ui.add_space(10.0);
-
-            self.render_artworks_list(ui);
+        // Top bar with menu toggle
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button(if self.sidebar_open { "☰ Hide Menu" } else { "☰ Show Menu" }).clicked() {
+                    self.sidebar_open = !self.sidebar_open;
+                }
+                ui.separator();
+                let title = match self.current_view {
+                    View::Gallery => "Artworks Gallery",
+                    View::Resume => "Resume",
+                    View::About => "About",
+                };
+                ui.heading(title);
+            });
         });
 
+        // Render sidebar
+        self.render_sidebar(ctx);
+
+        // Render main content based on current view
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match self.current_view {
+                View::Gallery => self.render_gallery_view(ui, ctx),
+                View::Resume => self.render_resume_view(ui, ctx),
+                View::About => self.render_about_view(ui),
+            }
+        });
+
+        // Artwork detail modal (still used for individual artwork details)
         self.render_artwork_modal(ctx);
-
-        // Old modal window (kept for reference)
-        if self.show_modal {
-            egui::Window::new("Modal Dialog")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.label("This is a modal dialog!");
-                    ui.add_space(10.0);
-
-                    if ui.button("Close").clicked() {
-                        self.show_modal = false;
-                    }
-                });
-        }
     }
 }
