@@ -4,11 +4,11 @@
     <meta charset="utf-8" />
     <title>megui</title>
     
-  <link rel="modulepreload" href="https://4www.github.io/megui/megui-3cec0b6283e7cc84.js" crossorigin="anonymous" integrity="sha384-VdCdHtzH/VZl2VW0XXWWNOxhwtBIpPOkEGQSwGBQZDk0LpuU0R/L5/aKX3D9y0e3"><link rel="preload" href="https://4www.github.io/megui/megui-3cec0b6283e7cc84_bg.wasm" crossorigin="anonymous" integrity="sha384-8j67Uu83T/vrA0RP04UvqaV0I+UKFVaYPWlmRORninC7BlYsgSf4P2t48EwLtjH1" as="fetch" type="application/wasm"></head>
+  <link rel="modulepreload" href="/megui-3cec0b6283e7cc84.js" crossorigin="anonymous" integrity="sha384-emMHysjLxSoP/CZSMhxIyqoplAsY1VlFb837TocgqitKeAV7NiJFflrx/xKDCG2F"><link rel="preload" href="/megui-3cec0b6283e7cc84_bg.wasm" crossorigin="anonymous" integrity="sha384-Oa8k36vDKBrt8NWRMS1bDW/F1Nd54VDOY0S54gfmxEZGte95fv3EVmrixqKI2fJb" as="fetch" type="application/wasm"></head>
   <body>
 <script type="module">
-import init, * as bindings from 'https://4www.github.io/megui/megui-3cec0b6283e7cc84.js';
-const wasm = await init({ module_or_path: 'https://4www.github.io/megui/megui-3cec0b6283e7cc84_bg.wasm' });
+import init, * as bindings from '/megui-3cec0b6283e7cc84.js';
+const wasm = await init({ module_or_path: '/megui-3cec0b6283e7cc84_bg.wasm' });
 
 
 window.wasmBindings = bindings;
