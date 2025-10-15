@@ -5,7 +5,7 @@ use std::sync::mpsc::Receiver;
 use crate::artwork::{Artwork, ArtworksResponse};
 use crate::components::{sidebar::Sidebar, settings::SettingsModal, ThemeMode};
 use crate::config::Config;
-use crate::pages::{AboutPage, ArtworksPage, ResumePage};
+use crate::pages::{HomePage, AboutPage, ArtworksPage, ResumePage};
 use crate::routes::Route;
 
 pub struct MeguiApp {
@@ -156,8 +156,8 @@ impl MeguiApp {
 
 impl eframe::App for MeguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Apply theme
-        self.theme_mode.apply(ctx);
+        // Apply theme with font sizes
+        self.theme_mode.apply_with_style(ctx);
 
         // Check for fetch responses
         self.process_fetch_response();
@@ -192,7 +192,7 @@ impl eframe::App for MeguiApp {
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .clicked()
                 {
-                    self.current_route = Route::Artworks;
+                    self.current_route = Route::Home;
                     self.current_route.update_browser_url();
                 }
 
@@ -207,8 +207,11 @@ impl eframe::App for MeguiApp {
         // Render main content based on current route
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.current_route {
+                Route::Home => HomePage::render(ui, &self.config),
                 Route::Artworks => ArtworksPage::render(
                     ui,
+                    ctx,
+                    &self.config,
                     &self.artworks,
                     &mut self.selected_artworks,
                     self.loading,

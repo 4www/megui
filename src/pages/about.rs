@@ -7,12 +7,19 @@ pub struct AboutPage;
 impl AboutPage {
     pub fn render(ui: &mut egui::Ui, config: &Config) {
         ui.heading("About");
+        ui.add_space(5.0);
+        ui.separator();
         ui.add_space(10.0);
 
         ui.label(format!(
             "{} - A simple artworks viewer and portfolio",
             config.app.name
         ));
+        ui.add_space(5.0);
+        ui.horizontal(|ui| {
+            ui.label("Website:");
+            ui.hyperlink_to("hwww.org", "https://hwww.org");
+        });
         ui.add_space(10.0);
 
         ui.label("Built with:");

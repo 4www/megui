@@ -14,6 +14,8 @@ impl ResumePage {
         markdown_cache: &mut CommonMarkCache,
     ) {
         ui.heading("Resume");
+        ui.add_space(5.0);
+        ui.separator();
         ui.add_space(10.0);
 
         if ui.button("🔗 Open in New Tab").clicked() {
@@ -26,8 +28,12 @@ impl ResumePage {
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             if let Some(markdown) = resume_content {
+                // Configure better spacing for markdown rendering
+                ui.style_mut().spacing.item_spacing.y = 8.0; // Space between elements
+
                 // Render markdown with proper formatting
                 egui_commonmark::CommonMarkViewer::new()
+                    .max_image_width(Some(800))
                     .show(ui, markdown_cache, markdown);
             } else {
                 ui.label("Loading resume...");

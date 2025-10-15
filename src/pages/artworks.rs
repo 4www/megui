@@ -11,11 +11,29 @@ pub struct ArtworksPage;
 impl ArtworksPage {
     pub fn render(
         ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        config: &Config,
         artworks: &[Artwork],
         selected_artworks: &mut Vec<Artwork>,
         loading: bool,
         error: &Option<String>,
     ) {
+        // Heading
+        ui.heading("Artworks");
+        ui.add_space(5.0);
+        ui.separator();
+        ui.add_space(10.0);
+
+        // Open artworks website button
+        if ui.button("🔗 Open Artworks Website").clicked() {
+            let artworks_base = config.app.artworks.trim_end_matches("/index.json");
+            ctx.open_url(egui::OpenUrl::new_tab(artworks_base));
+        }
+
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(10.0);
+
         // Error display
         if let Some(error) = error {
             ui.colored_label(egui::Color32::RED, format!("Error: {}", error));
@@ -23,19 +41,18 @@ impl ArtworksPage {
         }
 
         // Artworks list
-        Self::render_artworks_list(ui, artworks, selected_artworks, loading);
+        Self::render_artworks_list(ui, ctx, config, artworks, selected_artworks, loading);
     }
 
     fn render_artworks_list(
         ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        config: &Config,
         artworks: &[Artwork],
         selected_artworks: &mut Vec<Artwork>,
         loading: bool,
     ) {
         if !artworks.is_empty() {
-            ui.heading("Available Artworks:");
-            ui.add_space(5.0);
-
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for artwork in artworks {
                     ui.horizontal(|ui| {
@@ -47,6 +64,13 @@ impl ArtworksPage {
                         }
                         if let Some(info) = &artwork.info {
                             ui.label(info);
+                        }
+
+                        // Add "open in new tab" button
+                        if ui.small_button("🔗").on_hover_text("Open in New Tab").clicked() {
+                            let artworks_base = config.app.artworks.trim_end_matches("/index.json");
+                            let artwork_url = format!("{}/{}/", artworks_base, artwork.name);
+                            ctx.open_url(egui::OpenUrl::new_tab(&artwork_url));
                         }
                     });
                 }

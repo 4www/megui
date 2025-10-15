@@ -1,6 +1,7 @@
 /// Application routes/views
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Route {
+    Home,
     Artworks,
     Resume,
     About,
@@ -10,6 +11,7 @@ impl Route {
     #[cfg(target_arch = "wasm32")]
     pub fn to_hash(&self) -> &'static str {
         match self {
+            Route::Home => "#/home",
             Route::Artworks => "#/artworks",
             Route::Resume => "#/resume",
             Route::About => "#/about",
@@ -19,6 +21,7 @@ impl Route {
     #[cfg(target_arch = "wasm32")]
     pub fn from_hash(hash: &str) -> Option<Self> {
         match hash {
+            "#/home" | "#home" | "#/" | "#" | "" => Some(Route::Home),
             "#/artworks" | "#artworks" => Some(Route::Artworks),
             "#/resume" | "#resume" => Some(Route::Resume),
             "#/about" | "#about" => Some(Route::About),
@@ -37,11 +40,12 @@ impl Route {
                 }
             }
         }
-        Route::Artworks
+        Route::Home
     }
 
     pub fn title(&self) -> &'static str {
         match self {
+            Route::Home => "Home",
             Route::Artworks => "Artworks",
             Route::Resume => "Resume",
             Route::About => "About",

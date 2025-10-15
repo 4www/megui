@@ -18,9 +18,14 @@ impl Sidebar {
         resume_receiver: &mut Option<mpsc::Receiver<ehttp::Result<ehttp::Response>>>,
         settings_open: &mut bool,
     ) {
-        ui.heading("Menu");
-        ui.separator();
-        ui.add_space(10.0);
+        // Home route
+        let home_selected = *current_route == Route::Home;
+        if ui.selectable_label(home_selected, "Home").clicked() {
+            *current_route = Route::Home;
+            current_route.update_browser_url();
+        }
+
+        ui.add_space(5.0);
 
         // Artworks route
         let artworks_selected = *current_route == Route::Artworks;
@@ -81,7 +86,26 @@ impl Sidebar {
         // Settings button and footer
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             ui.add_space(10.0);
-            ui.label(format!("{} ©", config.app.name));
+            ui.horizontal(|ui| {
+                // Get current year dynamically
+                #[cfg(target_arch = "wasm32")]
+                let year = {
+                    let date = js_sys::Date::new_0();
+                    date.get_full_year() as i32
+                };
+                #[cfg(not(target_arch = "wasm32"))]
+                let year = {
+                    // For native, use system time
+                    use std::time::{SystemTime, UNIX_EPOCH};
+                    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                    let secs = duration.as_secs();
+                    // Convert to year (approximate)
+                    1970 + (secs / (365 * 24 * 60 * 60)) as i32
+                };
+
+                ui.label(format!("© {}", year));
+                ui.hyperlink_to(&config.app.name, &config.app.website);
+            });
             ui.add_space(10.0);
 
             if ui.button("⚙ Settings").clicked() {
