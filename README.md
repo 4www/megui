@@ -16,12 +16,13 @@ A simple artworks viewer and portfolio built with Rust, egui, and eframe.
 ```
 megui/
 ├── src/
-│   ├── lib.rs           # Application entry point
+│   ├── main.rs          # Application entry point
 │   ├── app.rs           # Main application logic, views, and UI
 │   ├── config.rs        # Configuration loader
 │   ├── artwork.rs       # Artwork data structures
 ├── config.toml          # Application configuration
 ├── index.html           # Web entry point
+├── Trunk.toml           # Trunk configuration
 ├── Cargo.toml           # Rust dependencies
 └── .github/
     └── workflows/
@@ -47,7 +48,7 @@ default_theme = "auto"  # Options: "auto", "dark", "light"
 ### Prerequisites
 
 - Rust (latest stable)
-- wasm-pack (for web builds): `cargo install wasm-pack`
+- Trunk (for web builds): `cargo install trunk`
 
 ### Running Locally
 
@@ -58,14 +59,12 @@ cargo run
 
 **Web (development):**
 ```bash
-# You need a local web server to serve the `dist` directory
-# For example, using `python -m http.server` in the `dist` directory
-wasm-pack build --target web --out-name wasm --out-dir ./dist
+trunk serve
 ```
 
 **Web (production build):**
 ```bash
-wasm-pack build --target web --out-name wasm --out-dir ./dist --release
+trunk build --release
 ```
 
 ### Building
@@ -77,7 +76,7 @@ cargo build --release
 
 **Web (WASM):**
 ```bash
-wasm-pack build --target web --out-name wasm --out-dir ./dist --release
+trunk build --release
 ```
 
 ## Deployment
@@ -94,7 +93,7 @@ The project automatically builds and deploys to GitHub Pages on push to the `mai
 - **[egui](https://www.egui.rs/)** - Immediate mode GUI framework
 - **[eframe](https://github.com/emilk/egui/tree/master/crates/eframe)** - Web and native support for egui
 - **[hframe](https://github.com/lucasmerlin/hello_egui/tree/main/crates/hframe)** - HTML iframe support for egui
-- **[wasm-pack](https://rustwasm.github.io/wasm-pack/)** - A tool for building and working with Rust-generated WebAssembly
+- **[Trunk](https://trunkrs.dev/)** - WASM web application bundler
 
 ## Routes
 

@@ -23,7 +23,7 @@ fn main() -> Result<(), eframe::Error> {
     {
         use eframe::wasm_bindgen::JsCast;
 
-        // Log to WebAssembly console
+        // Redirect tracing to console.log and friends:
         eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
         let web_options = eframe::WebOptions::default();
