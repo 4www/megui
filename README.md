@@ -16,7 +16,7 @@ A simple artworks viewer and portfolio built with Rust, egui, and eframe.
 ```
 megui/
 ├── src/
-│   ├── main.rs          # Application entry point
+│   ├── lib.rs           # Application entry point
 │   ├── app.rs           # Main application logic, views, and UI
 │   ├── config.rs        # Configuration loader
 │   ├── artwork.rs       # Artwork data structures
@@ -47,7 +47,7 @@ default_theme = "auto"  # Options: "auto", "dark", "light"
 ### Prerequisites
 
 - Rust (latest stable)
-- Trunk (for web builds): `cargo install trunk`
+- wasm-pack (for web builds): `cargo install wasm-pack`
 
 ### Running Locally
 
@@ -58,12 +58,14 @@ cargo run
 
 **Web (development):**
 ```bash
-trunk serve
+# You need a local web server to serve the `dist` directory
+# For example, using `python -m http.server` in the `dist` directory
+wasm-pack build --target web --out-name wasm --out-dir ./dist
 ```
 
 **Web (production build):**
 ```bash
-trunk build --release
+wasm-pack build --target web --out-name wasm --out-dir ./dist --release
 ```
 
 ### Building
@@ -75,19 +77,16 @@ cargo build --release
 
 **Web (WASM):**
 ```bash
-trunk build --release
+wasm-pack build --target web --out-name wasm --out-dir ./dist --release
 ```
 
 ## Deployment
 
-The project automatically deploys to GitHub Pages on push to `main` branch.
+The project automatically builds and deploys to GitHub Pages on push to the `main` branch using GitHub Actions.
 
-### Manual Deployment
-
-1. Ensure GitHub Pages is enabled in repository settings
-2. Push to `main` branch
-3. GitHub Actions will build and deploy automatically
-4. Site will be available at: `https://<username>.github.io/<repo-name>/`
+1. Push changes to the `main` branch.
+2. The GitHub Actions workflow (`.github/workflows/pages.yml`) will build the project and deploy it to GitHub Pages.
+3. The site will be available at: `https://<username>.github.io/<repo-name>/`
 
 ## Tech Stack
 
@@ -95,7 +94,7 @@ The project automatically deploys to GitHub Pages on push to `main` branch.
 - **[egui](https://www.egui.rs/)** - Immediate mode GUI framework
 - **[eframe](https://github.com/emilk/egui/tree/master/crates/eframe)** - Web and native support for egui
 - **[hframe](https://github.com/lucasmerlin/hello_egui/tree/main/crates/hframe)** - HTML iframe support for egui
-- **[Trunk](https://trunkrs.dev/)** - WASM web application bundler
+- **[wasm-pack](https://rustwasm.github.io/wasm-pack/)** - A tool for building and working with Rust-generated WebAssembly
 
 ## Routes
 

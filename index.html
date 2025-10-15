@@ -48,5 +48,9 @@
 </head>
 <body>
     <canvas id="the_canvas_id"></canvas>
+    <script type="module">
+        import init from "./wasm.js";
+        init("./wasm_bg.wasm");
+    </script>
 </body>
 </html>
