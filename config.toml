@@ -1,7 +1,7 @@
 [app]
 name = "hwww"
 website = "https://hwww.org"
-resume = "https://resume.hwww.org"
+resume = "https://resume.hwww.org/resume"
 artworks = "https://artworks.hwww.org/index.json"
 repository = "https://github.com/4www/megui"
 default_theme = "auto"  # Options: "auto", "dark", "light"
