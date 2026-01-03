@@ -118,8 +118,10 @@ impl MeguiApp {
                 match result {
                     Ok(response) => {
                         if let Some(html) = response.text() {
+                            // Strip script and style tags before converting to markdown
+                            let cleaned_html = Self::strip_script_and_style_tags(html);
                             // Convert HTML to Markdown
-                            let markdown = html2md::parse_html(html);
+                            let markdown = html2md::parse_html(&cleaned_html);
                             self.resume_content = Some(markdown);
                             self.current_route = Route::Resume;
                         } else {
@@ -132,6 +134,13 @@ impl MeguiApp {
                 }
             }
         }
+    }
+
+    fn strip_script_and_style_tags(html: &str) -> String {
+        // Use ammonia to sanitize HTML
+        // By default, ammonia removes script and style tags along with their content
+        // and uses a whitelist-based approach to only keep safe HTML tags
+        ammonia::clean(html)
     }
 
     fn render_sidebar(&mut self, ctx: &egui::Context) {

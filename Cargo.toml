@@ -19,6 +19,7 @@ log = "0.4"
 html2md = "0.2"
 egui_commonmark = "0.22"
 toml = "0.8"
+ammonia = "4.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
