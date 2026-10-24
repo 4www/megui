@@ -89,6 +89,7 @@ impl MeguiApp {
                                 Ok(data) => {
                                     if let Some(first) = data.first() {
                                         self.artworks = first.contents.clone();
+                                        self.open_random_artworks();
                                     } else {
                                         self.error = Some("No data returned".to_string());
                                     }
@@ -106,6 +107,15 @@ impl MeguiApp {
                     }
                 }
             }
+        }
+    }
+
+    fn open_random_artworks(&mut self) {
+        if self.current_route == Route::Home && self.selected_artworks.is_empty() {
+            self.selected_artworks = fastrand::choose_multiple(
+                self.artworks.iter().cloned(),
+                self.config.app.home_artworks,
+            );
         }
     }
 

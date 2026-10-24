@@ -9,10 +9,16 @@ pub struct AppConfig {
     pub repository: String,
     #[serde(default = "default_theme")]
     pub default_theme: String,
+    #[serde(default = "default_home_artworks")]
+    pub home_artworks: usize,
 }
 
 fn default_theme() -> String {
     "auto".to_string()
+}
+
+fn default_home_artworks() -> usize {
+    3
 }
 
 #[derive(Debug, Clone, Deserialize)]

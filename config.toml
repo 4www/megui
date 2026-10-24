@@ -5,3 +5,4 @@ resume = "https://resume.hwww.org/cv"
 artworks = "https://artworks.hwww.org/index.json"
 repository = "https://github.com/4www/megui"
 default_theme = "auto"  # Options: "auto", "dark", "light"
+home_artworks = 3  # Random artworks opened when the site loads on the home page
