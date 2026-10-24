@@ -109,6 +109,19 @@ impl MeguiApp {
         }
     }
 
+    fn start_resume_fetch(&mut self, ctx: &egui::Context) {
+        self.resume_loading = true;
+        let (sender, receiver) = std::sync::mpsc::channel();
+        self.resume_receiver = Some(receiver);
+
+        let ctx = ctx.clone();
+        let resume_url = self.config.app.resume.clone();
+        ehttp::fetch(ehttp::Request::get(&resume_url), move |result| {
+            let _ = sender.send(result);
+            ctx.request_repaint();
+        });
+    }
+
     fn process_resume_response(&mut self) {
         if let Some(receiver) = &self.resume_receiver {
             if let Ok(result) = receiver.try_recv() {
@@ -123,7 +136,6 @@ impl MeguiApp {
                             // Convert HTML to Markdown
                             let markdown = html2md::parse_html(&cleaned_html);
                             self.resume_content = Some(markdown);
-                            self.current_route = Route::Resume;
                         } else {
                             self.error = Some("Failed to read resume".to_string());
                         }
@@ -150,13 +162,10 @@ impl MeguiApp {
             .show_animated(ctx, self.sidebar_open, |ui| {
                 Sidebar::render(
                     ui,
-                    ctx,
                     &self.config,
                     &mut self.current_route,
                     self.artworks.len(),
-                    &self.resume_content,
-                    &mut self.resume_loading,
-                    &mut self.resume_receiver,
+                    self.resume_loading,
                     &mut self.settings_open,
                 );
             });
@@ -167,6 +176,14 @@ impl eframe::App for MeguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Apply theme with font sizes
         self.theme_mode.apply_with_style(ctx);
+
+        // Fetch resume on first visit to its route (sidebar click or direct URL)
+        if self.current_route == Route::Resume
+            && self.resume_content.is_none()
+            && !self.resume_loading
+        {
+            self.start_resume_fetch(ctx);
+        }
 
         // Check for fetch responses
         self.process_fetch_response();

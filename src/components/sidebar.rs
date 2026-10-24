@@ -1,5 +1,4 @@
 use eframe::egui;
-use std::sync::mpsc;
 
 use crate::config::Config;
 use crate::routes::Route;
@@ -9,13 +8,10 @@ pub struct Sidebar;
 impl Sidebar {
     pub fn render(
         ui: &mut egui::Ui,
-        ctx: &egui::Context,
         config: &Config,
         current_route: &mut Route,
         artworks_count: usize,
-        resume_content: &Option<String>,
-        resume_loading: &mut bool,
-        resume_receiver: &mut Option<mpsc::Receiver<ehttp::Result<ehttp::Response>>>,
+        resume_loading: bool,
         settings_open: &mut bool,
     ) {
         // Home route
@@ -40,28 +36,11 @@ impl Sidebar {
         let resume_selected = *current_route == Route::Resume;
         ui.horizontal(|ui| {
             if ui.selectable_label(resume_selected, "Resume").clicked() {
-                if resume_content.is_none() && !*resume_loading {
-                    // Fetch resume if not already loaded
-                    *resume_loading = true;
-                    let ctx = ctx.clone();
-                    let (sender, receiver) = mpsc::channel();
-                    *resume_receiver = Some(receiver);
-
-                    let resume_url = config.app.resume.clone();
-                    ehttp::fetch(
-                        ehttp::Request::get(&resume_url),
-                        move |result| {
-                            let _ = sender.send(result);
-                            ctx.request_repaint();
-                        },
-                    );
-                } else if resume_content.is_some() {
-                    *current_route = Route::Resume;
-                }
+                *current_route = Route::Resume;
                 current_route.update_browser_url();
             }
 
-            if *resume_loading {
+            if resume_loading {
                 ui.spinner();
             }
         });
